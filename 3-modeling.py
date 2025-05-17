@@ -143,9 +143,13 @@ plt.close()
 mse_df = pd.DataFrame(list(mse_dict.items()), columns=['城市', 'MSE'])
 mse_df = mse_df.sort_values(by='MSE')
 
+
+
 # Display the MSE table
 print('\n模型指标表格（按MSE升序排列）：')
 print(mse_df)
+
+
 
 # Plot MSE bar chart using Seaborn
 plt.figure(figsize=(12, 6))
@@ -173,3 +177,95 @@ for i, month in enumerate(pd.date_range('2023-01-01', '2023-12-01', freq='MS')):
 merged_data_with_validation.to_csv('A题数据/merged_data_with_validation.csv', index=False, encoding='utf-8-sig')
 
 print("\n已将 validation 数据填入 merged_data 并保存为 merged_data_with_validation.csv。")
+
+
+# 计算每个城市2018-2023年的平均空气质量指数
+avg_aqi = merged_data.groupby('城市')['空气质量综合指数'].mean().sort_values()
+
+# 可视化：平均空气质量直方图
+plt.figure(figsize=(12, 6))
+sns.barplot(x=avg_aqi.index, y=avg_aqi.values, palette='coolwarm')
+
+plt.title('2018–2023年各城市平均空气质量综合指数')
+plt.xlabel('城市')
+plt.ylabel('平均空气质量综合指数')
+plt.xticks(rotation=45)
+plt.grid(axis='y')
+plt.tight_layout()
+plt.savefig('average_air_quality_bar.png')
+plt.close()
+
+print("\n已生成各城市平均空气质量直方图：average_air_quality_bar.png")
+
+
+
+from sklearn.preprocessing import StandardScaler
+from sklearn.ensemble import RandomForestRegressor
+
+# 保存标准化回归系数与随机森林重要性
+coef_table = pd.DataFrame()
+rf_importance_table = pd.DataFrame()
+
+for city in cities:
+    city_train_data = train_data[train_data['城市'] == city].copy()
+    city_train_data['A_next'] = city_train_data['空气质量综合指数'].shift(-1)
+    city_train_data = city_train_data.dropna()
+    
+    X = city_train_data[['空气质量综合指数'] + features].astype(float)
+    y = city_train_data['A_next'].astype(float)
+
+    # 标准化处理
+    scaler = StandardScaler()
+    X_scaled = scaler.fit_transform(X)
+
+    # 标准化回归模型
+    std_model = LinearRegression()
+    std_model.fit(X_scaled, y)
+    coefs = std_model.coef_
+    
+    coef_df = pd.DataFrame({
+        '城市': city,
+        '变量': ['空气质量综合指数'] + features,
+        '标准化系数': coefs
+    })
+    coef_table = pd.concat([coef_table, coef_df], ignore_index=True)
+
+    # 随机森林重要性分析
+    rf = RandomForestRegressor(random_state=42, n_estimators=100)
+    rf.fit(X, y)
+    importances = rf.feature_importances_
+
+    rf_df = pd.DataFrame({
+        '城市': city,
+        '变量': ['空气质量综合指数'] + features,
+        '重要性': importances
+    })
+    rf_importance_table = pd.concat([rf_importance_table, rf_df], ignore_index=True)
+
+# 保存表格
+coef_table.to_csv('A题数据/standardized_coefficients.csv', index=False, encoding='utf-8-sig')
+rf_importance_table.to_csv('A题数据/random_forest_importance.csv', index=False, encoding='utf-8-sig')
+
+# 可视化：每个城市的标准化回归系数图
+for city in cities:
+    city_coef = coef_table[coef_table['城市'] == city].sort_values(by='标准化系数', ascending=False)
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='标准化系数', y='变量', data=city_coef, palette='coolwarm')
+    plt.title(f'{city} - 标准化回归系数（越大越重要）')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f'{city}_standardized_coefficients.png')
+    plt.close()
+
+# 可视化：每个城市的随机森林重要性图
+for city in cities:
+    city_rf = rf_importance_table[rf_importance_table['城市'] == city].sort_values(by='重要性', ascending=False)
+    plt.figure(figsize=(10, 6))
+    sns.barplot(x='重要性', y='变量', data=city_rf, palette='viridis')
+    plt.title(f'{city} - 随机森林特征重要性')
+    plt.grid(True)
+    plt.tight_layout()
+    plt.savefig(f'{city}_random_forest_importance.png')
+    plt.close()
+
+print("\n已完成标准化回归系数与随机森林重要性分析，并生成每个城市的条形图。")

@@ -3,7 +3,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # 读取 MSE 比较结果文件
-mse_df = pd.read_csv('模型MSE比较结果.csv')
+mse_df = pd.read_csv('Image\模型MSE比较结果.csv')
 
 # 设置中文字体（根据你的环境调整）
 plt.rcParams['font.sans-serif'] = ['SimHei']
